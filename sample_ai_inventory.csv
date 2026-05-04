@@ -1,0 +1,7 @@
+System ID,System Name,Risk Tier,Owner,Status,Last Reviewed,Notes
+LAI-001,Loan AI,High,Risk Operations,Production,2026-03-15,EU AI Act Annex III(5) classification
+HRA-002,Resume Ranker,High,People & Talent,Production,2026-02-28,EU AI Act Annex III(4) classification
+FRD-003,Fraud Detection,Medium,Risk Operations,Production,2026-04-10,Limited risk transparency apply
+CHB-004,Customer Support Chatbot,Limited,Customer Experience,Production,2026-04-22,Article 50 disclosure required
+CRD-005,Credit Card Eligibility,High,Risk Operations,Pilot,2026-03-30,Same Annex III(5) as LAI-001
+DAT-006,Internal Data Classification,Minimal,IT Security,Production,2026-04-05,No EU AI Act obligations

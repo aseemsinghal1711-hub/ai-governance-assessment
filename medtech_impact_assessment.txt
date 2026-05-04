@@ -1,0 +1,67 @@
+MEDTECH HEALTH - AI IMPACT ASSESSMENT
+System: MedTriage AI v4.2
+Assessor: MedTech AI Governance Lead
+Date: 12 January 2026
+Approved by AI Governance Committee: 28 January 2026
+Next Review: January 2027
+
+1. SYSTEM DESCRIPTION
+MedTriage AI is a clinical decision support system that evaluates patient-reported
+symptoms in the emergency department waiting area and recommends a triage priority
+level (1-5 ESI scale) to assist triage nurses. Final triage decisions remain with
+licensed nursing staff. Deployed in 47 hospitals across the EU and UK.
+
+2. INTENDED USE
+2.1 Primary use: Reduce nurse workload by pre-screening patient symptoms.
+2.2 Decision boundaries: AI provides recommendations only; clinical judgment by
+licensed staff is the final determinant of triage priority.
+2.3 Out-of-scope: NOT used for definitive diagnosis, treatment selection, or
+medication recommendations.
+
+3. RISK ASSESSMENT
+
+3.1 Clinical Risks
+- False low-priority assignment leading to delayed care
+  Mitigation: Conservative model bias toward over-triage; nurse review mandatory
+  Residual risk: LOW
+
+- Model failure leading to recommendation absence
+  Mitigation: Manual triage protocol unchanged; AI is augmentation only
+  Residual risk: LOW
+
+3.2 Fundamental Rights Risks
+- Disparate triage outcomes across demographic groups
+  Mitigation: Quarterly bias testing per Methodology v3.0
+  Residual risk: MEDIUM (see ongoing remediation for Ethnicity C marginal metric)
+
+- Loss of patient autonomy in triage decisions
+  Mitigation: AI recommendations are not binding; informed consent on AI use
+  Residual risk: LOW
+
+3.3 Data Protection Risks
+- Sensitive health data processed at scale
+  Mitigation: All data pseudonymized; lawful basis under Article 9(2)(h) GDPR
+  (provision of healthcare). Data Processing Agreement with model vendor.
+  Residual risk: LOW
+
+3.4 Operational Risks
+- Model drift over time as patient populations change
+  Mitigation: Monthly drift monitoring; quarterly retraining cycle
+  Residual risk: LOW
+
+4. EU AI ACT CLASSIFICATION
+This system is high-risk under EU AI Act Annex III(5)(a) (essential services -
+healthcare access). System is being prepared for full EU AI Act compliance by
+2 August 2026. Specific actions in progress:
+- Updating technical documentation to Article 11 standards
+- Establishing post-market monitoring system per Article 72
+- Preparing for conformity assessment
+
+5. RECOMMENDATIONS
+5.1 Continue current bias testing cadence; complete Ethnicity C remediation by Q3 2026.
+5.2 Complete EU AI Act Article 11 documentation by 1 July 2026.
+5.3 Annual reassessment scheduled for January 2027.
+
+6. APPROVAL
+Recommended for continued operation with mitigations.
+Approved by AI Governance Committee, 28 January 2026.

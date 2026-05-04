@@ -1,0 +1,49 @@
+MEDTECH HEALTH - BIAS TESTING METHODOLOGY
+Version 3.0 (Approved by AI Governance Committee, January 2026)
+
+1. PURPOSE
+This methodology defines the approach for assessing AI systems at MedTech Health
+for fairness and disparate impact across protected attributes.
+
+2. SCOPE
+Applies to all AI systems making decisions or recommendations that materially
+affect patient care, treatment access, or operational outcomes for individuals.
+
+3. PROTECTED ATTRIBUTES TESTED
+3.1 Required attributes (always tested where data available):
+- Sex (binary classification per registration data)
+- Age (categorized: 18-30, 31-50, 51-70, 71+)
+- Ethnicity (where collected with consent per applicable law)
+- Socioeconomic indicators (insurance type as proxy where direct data unavailable)
+
+3.2 Additional attributes (tested where ethically appropriate):
+- Geographic region (urban/rural)
+- Primary language
+
+4. METRICS APPLIED
+4.1 Primary metrics:
+- Disparate Impact Ratio (target: >= 0.80 across all protected groups)
+- Demographic Parity Difference (target: <= 0.05)
+- Equal Opportunity Difference (target: <= 0.05)
+- Calibration error by group (target: <= 0.02)
+
+4.2 Supplementary metrics applied based on system context:
+- False Negative Rate Parity (for safety-critical systems)
+- Predictive Value Parity (for treatment recommendation systems)
+
+5. CADENCE
+5.1 Pre-deployment baseline test required for all systems.
+5.2 Quarterly production retest for clinical AI systems.
+5.3 Annual full audit including methodology review.
+
+6. REMEDIATION PROTOCOL
+6.1 When metrics fall outside thresholds, AI Governance Committee determines
+remediation pathway: model retraining, data rebalancing, threshold adjustment,
+or system suspension.
+
+6.2 Remediation must be implemented within 90 days of identification or system
+must be suspended pending remediation.
+
+7. DOCUMENTATION
+All bias test results, including methodology applied, sample sizes, and any
+identified disparities, are documented in the MedTech AI Test Registry.

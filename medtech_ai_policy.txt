@@ -1,0 +1,83 @@
+MEDTECH HEALTH - AI GOVERNANCE POLICY
+Version 2.1 (Approved by Board, March 2025)
+Effective Date: 1 April 2025
+Next Review: 1 April 2026
+
+1. PURPOSE
+This policy establishes the framework for responsible development, deployment,
+and operation of AI systems at MedTech Health, with particular focus on systems
+affecting patient care and clinical decision support.
+
+2. SCOPE
+Applies to all AI systems developed by, deployed by, or procured by MedTech Health,
+across all clinical and operational domains. Includes both first-party and
+third-party AI systems integrated into MedTech operations.
+
+3. GOVERNANCE STRUCTURE
+3.1 The AI Governance Committee, chaired by the Chief Medical Officer, holds
+ultimate accountability for AI risk. Committee meets monthly.
+Members: CMO (chair), CRO, CISO, Head of Data Science, Head of Clinical Operations,
+Head of Legal, Privacy Officer, two clinician representatives.
+
+3.2 The AI Governance Lead is a dedicated 1.0 FTE role reporting to the CRO,
+responsible for day-to-day governance, policy maintenance, training coordination,
+and external regulatory engagement.
+
+3.3 Each AI system must have a designated Product Owner accountable for
+operational compliance. Product Owners report to the AI Governance Committee
+quarterly on system performance, incidents, and risk register updates.
+
+4. AI LIFECYCLE GOVERNANCE
+4.1 Pre-deployment Impact Assessment: All AI systems require documented impact
+assessment using the MedTech AIA template before deployment. Template covers
+clinical risks, fundamental rights impacts, fairness considerations, and
+data protection.
+
+4.2 Bias and Fairness: All AI systems making decisions affecting patients must
+undergo bias testing using the MedTech Bias Testing Methodology v3.0, covering
+protected attributes including sex, age, ethnicity, and socioeconomic indicators
+where available. Testing performed quarterly in production. Results reviewed
+by the AI Governance Committee.
+
+4.3 Human Oversight: All clinical AI systems are designed for human-in-the-loop
+operation. AI outputs are recommendations only; final clinical decisions remain
+with licensed clinicians. The 'override' rate is monitored as a quality indicator.
+
+4.4 Production Monitoring: All AI systems must have automated monitoring covering:
+performance drift, fairness drift, error rates, and prediction distribution.
+Alerts route to the AI Governance Lead for triage.
+
+4.5 Transparency: Patients are informed when AI is used in their care via
+posted notices and consent forms. Detailed explanations are available on request.
+
+5. THIRD-PARTY AI
+5.1 Procurement of third-party AI systems requires AI Governance Committee approval
+including review of vendor's bias testing methodology, validation studies, and
+ongoing monitoring commitments.
+
+5.2 Annual vendor reassessment is conducted including review of any model updates,
+new validation data, and incidents.
+
+6. INCIDENT MANAGEMENT
+6.1 Suspected adverse events involving AI systems are reported through the
+MedTech Patient Safety Reporting system within 24 hours.
+
+6.2 The AI Governance Lead conducts root cause analysis with the relevant
+Product Owner and reports findings to the AI Governance Committee within 14 days.
+
+7. TRAINING
+7.1 Mandatory annual AI literacy training for all staff using AI systems.
+7.2 Specialized training for AI Governance Committee members and Product Owners.
+
+8. REGULATORY COMPLIANCE
+8.1 The AI Governance Committee maintains a regulatory horizon scan including
+EU AI Act, FDA guidance, MHRA guidance, and applicable state regulations.
+
+8.2 Note: This policy is currently being updated to address EU AI Act high-risk
+system obligations applicable from 2 August 2026. Updated procedures expected by
+Q2 2026.
+
+9. POLICY REVIEW
+This policy is reviewed annually or upon significant regulatory change.
+
+Approved: Board of Directors, 15 March 2025

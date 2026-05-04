@@ -1,0 +1,47 @@
+ACME FINTECH - INTERIM AI USE POLICY
+Version 0.1 (DRAFT)
+Effective Date: March 2026
+
+1. PURPOSE
+This policy establishes interim guidelines for the use of artificial intelligence
+systems within Acme Fintech, with specific focus on the Loan AI system used for
+automated credit decisions.
+
+2. SCOPE
+This policy applies to all AI systems deployed in production that materially
+affect customer outcomes, including but not limited to: credit scoring, loan
+approval, fraud detection, and customer service automation.
+
+3. PRINCIPLES
+3.1 Human Oversight: All adverse decisions (loan denials) shall be reviewed by
+a human credit officer before communication to the applicant. Loan approvals 
+above EUR 50,000 shall also receive human review.
+
+3.2 Fairness: AI systems shall not discriminate on the basis of protected
+attributes including gender, age, ethnicity, or disability. The Data Science
+team is responsible for documenting bias testing methodology and results.
+
+3.3 Transparency: Customers shall be informed when AI is used in decisions
+affecting them, in accordance with GDPR Article 22.
+
+4. GOVERNANCE
+4.1 The Chief Risk Officer is the ultimate accountable owner for AI risk.
+4.2 An AI Governance Lead shall be designated by Q3 2026.
+4.3 An AI Governance Committee shall be established with representation from
+Risk, Legal, Data Science, and Product Management.
+
+5. GAPS AND ROADMAP
+The organization acknowledges the following gaps that will be addressed:
+- No formal Data Protection Impact Assessment has been conducted
+- No documented bias testing methodology currently exists
+- No production monitoring for model drift is in place
+- No formal AI risk register has been integrated into enterprise risk management
+
+These gaps will be addressed per the Q2-Q4 2026 remediation roadmap.
+
+6. REVIEW
+This interim policy shall be reviewed quarterly until superseded by the
+formal AI Governance Policy expected in Q4 2026.
+
+Approved by: [TO BE SIGNED]
+Date: [DRAFT]
