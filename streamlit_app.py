@@ -16,6 +16,20 @@ except Exception:
     pass  # st.secrets only works on Streamlit Cloud; locally we use .env
 
 # =============================================================================
+# Auto-build vector store on first run (needed for Streamlit Cloud)
+# =============================================================================
+from build_vectorstore import store_exists, build_store
+
+if not store_exists():
+    with st.spinner("First-time setup: building the AI governance knowledge base. This takes about 60 seconds..."):
+        try:
+            count = build_store(verbose=False)
+            st.success(f"✅ Knowledge base built. Indexed {count} controls across ISO 42001, NIST AI RMF, and EU AI Act.")
+        except Exception as e:
+            st.error(f"Failed to build vector store: {e}")
+            st.stop()
+
+# =============================================================================
 # Page config (must be first Streamlit call)
 # =============================================================================
 st.set_page_config(
