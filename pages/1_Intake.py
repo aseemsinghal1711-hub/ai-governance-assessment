@@ -6,15 +6,20 @@ from intake_agent_v2 import build_intake_agent_v2, ProfileStateV2
 from models import AISystemProfile
 
 
+# =============================================================================
+# Page setup
+# =============================================================================
 st.title("🗣️ 1. Intake")
 st.markdown(
     "Have a conversation with the AI Governance Specialist. The agent will ask "
-    "structured questions about your AI system and its current governance state."
+    "structured questions about your AI system, then move you to evidence upload."
 )
 st.divider()
 
 
-# Initialize state
+# =============================================================================
+# Session state initialization
+# =============================================================================
 if "profile_state" not in st.session_state:
     st.session_state.profile_state = ProfileStateV2()
 
@@ -22,21 +27,58 @@ if "intake_agent" not in st.session_state:
     st.session_state.intake_agent = build_intake_agent_v2(st.session_state.profile_state)
 
 if "intake_messages" not in st.session_state:
-    st.session_state.intake_messages = []
-    initial = st.session_state.intake_agent.invoke({
-        "messages": [HumanMessage(content="Hi, I'm ready to start.")]
-    })
-    st.session_state.intake_messages = initial["messages"]
+    # Kick off conversation with the agent's opening greeting
+    with st.spinner("Connecting to AI Governance Specialist..."):
+        try:
+            initial = st.session_state.intake_agent.invoke({
+                "messages": [HumanMessage(content="Hi, I'm ready to start.")]
+            })
+            st.session_state.intake_messages = initial["messages"]
+        except Exception as e:
+            st.error(f"Failed to start conversation: {e}")
+            st.stop()
 
 if "profile" not in st.session_state:
     st.session_state.profile = None
 
 
+# =============================================================================
+# Helpers
+# =============================================================================
+KICKOFF_MESSAGE = "Hi, I'm ready to start."
+
+
+def extract_text(content):
+    """Extract clean text from message content (handles strings or list-of-blocks)."""
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict):
+                # Standard format: {"type": "text", "text": "..."}
+                text = block.get("text", "")
+                if text:
+                    parts.append(text)
+            elif isinstance(block, str):
+                parts.append(block)
+        return "\n".join(parts).strip()
+    return str(content).strip()
+
+
 def try_finalize_profile():
+    """If the agent said INTAKE COMPLETE and we have all fields, build the profile."""
     if not st.session_state.intake_messages:
         return
+    
     last = st.session_state.intake_messages[-1]
-    if not isinstance(last, AIMessage) or "INTAKE COMPLETE" not in last.content:
+    if not isinstance(last, AIMessage):
+        return
+    
+    last_text = extract_text(last.content)
+    if "INTAKE COMPLETE" not in last_text:
         return
     
     state = st.session_state.profile_state
@@ -44,8 +86,8 @@ def try_finalize_profile():
     
     if missing:
         st.warning(
-            f"⚠️ Agent said INTAKE COMPLETE but missing required fields: `{', '.join(missing)}`. "
-            f"Continue the conversation to fill these, or click **Reset conversation** below."
+            f"The agent signaled INTAKE COMPLETE but these required fields are missing: "
+            f"`{', '.join(missing)}`. Continue the conversation to fill them, or reset and start over."
         )
         return
     
@@ -56,27 +98,46 @@ def try_finalize_profile():
         profile.evidence_attachments = list(state.evidence)
         st.session_state.profile = profile
     except Exception as e:
-        st.error(f"⚠️ Profile validation error: {e}")
+        st.error(f"Profile validation error: {e}")
 
 
+def reset_intake():
+    """Clear all intake state and start fresh."""
+    st.session_state.profile_state = ProfileStateV2()
+    st.session_state.intake_agent = build_intake_agent_v2(st.session_state.profile_state)
+    st.session_state.profile = None
+    if "intake_messages" in st.session_state:
+        del st.session_state.intake_messages
+
+
+# Always check for completion on every render
 try_finalize_profile()
 
 
-# Render chat history
+# =============================================================================
+# Render the conversation
+# =============================================================================
 for msg in st.session_state.intake_messages:
     if isinstance(msg, HumanMessage):
-        if msg.content == "Hi, I'm ready to start.":
+        # Hide the kickoff message from the visible chat
+        text = extract_text(msg.content)
+        if text == KICKOFF_MESSAGE:
             continue
         with st.chat_message("user"):
-            st.markdown(msg.content)
+            st.markdown(text)
+    
     elif isinstance(msg, AIMessage):
-        content_str = msg.content if isinstance(msg.content, str) else str(msg.content)
-        if content_str and content_str.strip():
-            with st.chat_message("assistant"):
-                st.markdown(content_str)
+        text = extract_text(msg.content)
+        # Skip empty messages (sometimes happen with tool-calling messages)
+        if not text:
+            continue
+        with st.chat_message("assistant"):
+            st.markdown(text)
 
 
+# =============================================================================
 # Input or completion state
+# =============================================================================
 if st.session_state.profile is None:
     user_input = st.chat_input("Type your response here...")
     if user_input:
@@ -92,30 +153,44 @@ if st.session_state.profile is None:
         try_finalize_profile()
         st.rerun()
 else:
-    st.success("✅ Intake complete!")
+    # Intake complete — show success card with summary
+    st.success("✅ Intake complete")
+    
     profile = st.session_state.profile
     
     with st.container(border=True):
-        st.markdown(f"**System:** {profile.system_name}")
-        st.markdown(f"**Sector:** {profile.deployment_sector}")
-        st.markdown(f"**Geography:** {', '.join(profile.deployment_geographies)}")
-        st.markdown(f"**Evidence attached:** {len(profile.evidence_attachments)}")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**System:** {profile.system_name}")
+            st.markdown(f"**Sector:** {profile.deployment_sector}")
+        with col2:
+            st.markdown(f"**Geography:** {', '.join(profile.deployment_geographies)}")
+            st.markdown(f"**Evidence attached:** {len(profile.evidence_attachments)}")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**Next:** Continue to **2. Evidence** in the sidebar to upload more documents, or skip ahead to **3. Assessment**.")
-    with col2:
-        if st.button("🔄 Reset conversation", type="secondary"):
-            st.session_state.profile_state = ProfileStateV2()
-            st.session_state.intake_agent = build_intake_agent_v2(st.session_state.profile_state)
-            st.session_state.intake_messages = []
-            st.session_state.profile = None
-            st.rerun()
+    st.markdown("### What's next")
+    st.markdown(
+        "- Continue to **2. Evidence** in the sidebar to upload supporting documents\n"
+        "- Or skip ahead to **3. Assessment** if no additional evidence is needed"
+    )
+    
+    if st.button("🔄 Start over", type="secondary"):
+        reset_intake()
+        st.rerun()
 
 
-with st.expander("🔍 Debug: profile state"):
+# =============================================================================
+# Diagnostic panel (collapsed by default; useful when something looks off)
+# =============================================================================
+with st.expander("🔧 Diagnostics", expanded=False):
     state = st.session_state.profile_state
-    st.markdown(f"**Fields collected:** {len(state.fields)}/{len(state.REQUIRED_FIELDS)}")
+    collected = len(state.fields)
+    required = len(state.REQUIRED_FIELDS)
+    st.markdown(f"**Fields collected:** {collected} / {required}")
+    
+    if collected < required:
+        missing = [f for f in state.REQUIRED_FIELDS if f not in state.fields]
+        st.markdown(f"**Still needed:** `{', '.join(missing)}`")
+    
     st.json({
         "fields": state.fields,
         "evidence_count": len(state.evidence),
