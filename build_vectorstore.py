@@ -3,7 +3,12 @@ Build the unified AI governance vector store using LOCAL embeddings.
 
 Uses sentence-transformers/all-MiniLM-L6-v2 — a free, local embedding model.
 No API calls, no quotas. Model downloads once (~90MB) and runs on your laptop.
+
+Can be run as a script (python build_vectorstore.py) or imported and called
+via build_store() — the latter is used by streamlit_app.py to auto-build
+on Streamlit Cloud where the vector store doesn't exist yet.
 """
+import os
 from dotenv import load_dotenv
 import chromadb
 from sentence_transformers import SentenceTransformer
@@ -15,23 +20,13 @@ from eu_ai_act import EU_AI_ACT_RISK_TIERS, EU_AI_ACT_ANNEX_III
 
 load_dotenv()
 
-print("🔄 Loading the local embedding model (downloads ~90MB on first run)...")
-# all-MiniLM-L6-v2 produces 384-dimensional vectors
-# It's small, fast, and works well for semantic search over technical content
-embeddings_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-print(f"✅ Model loaded. Embedding dimension: {embeddings_model.get_sentence_embedding_dimension()}")
-
-print("🔄 Setting up ChromaDB...")
-client = chromadb.PersistentClient(path="./ai_gov_chroma_db")
-
-# Wipe old collection if it exists (to switch from old Gemini-embedded vectors)
-try:
-    client.delete_collection(name="ai_governance")
-    print("🧹 Removed old collection")
-except Exception:
-    pass
-
-collection = client.create_collection(name="ai_governance")
+# Absolute path anchored to this file's location.
+# This works correctly whether the working directory is the project folder
+# (local dev) or some other path (Streamlit Cloud).
+_DEFAULT_DB_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "ai_gov_chroma_db"
+)
 
 
 def prepare_text_for_embedding(item):
@@ -51,45 +46,87 @@ def prepare_text_for_embedding(item):
     return "\n".join(parts)
 
 
-def index_items(items, label):
-    """Embed and index a batch of governance items using local model."""
-    print(f"\n🔄 Indexing {label} ({len(items)} items)...")
+def build_store(db_path: str = None, verbose: bool = True):
+    """
+    Build the AI governance vector store.
     
-    ids = [item['id'] for item in items]
-    documents = [prepare_text_for_embedding(item) for item in items]
-    metadatas = [
-        {
-            "framework": item['framework'],
-            "category": item.get('category', ''),
-            "title": item['title'],
-        }
-        for item in items
-    ]
+    Idempotent — safe to call multiple times. If the collection exists, it's
+    deleted and rebuilt. Returns the count of indexed items.
+    """
+    if db_path is None:
+        db_path = _DEFAULT_DB_PATH
     
-    # Local embedding — no API call, runs on your CPU
-    # show_progress_bar=True gives visual feedback for slow runs
-    vectors = embeddings_model.encode(
-        documents,
-        show_progress_bar=True,
-        convert_to_numpy=True
-    ).tolist()
+    def log(msg):
+        if verbose:
+            print(msg)
     
-    collection.add(
-        ids=ids,
-        documents=documents,
-        embeddings=vectors,
-        metadatas=metadatas
-    )
-    print(f"✅ Indexed {len(ids)} {label}")
+    log("🔄 Loading the local embedding model (downloads ~90MB on first run)...")
+    embeddings_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    log(f"✅ Model loaded. Embedding dimension: {embeddings_model.get_sentence_embedding_dimension()}")
+    
+    log("🔄 Setting up ChromaDB...")
+    client = chromadb.PersistentClient(path=db_path)
+    
+    # Wipe old collection if it exists
+    try:
+        client.delete_collection(name="ai_governance")
+        log("🧹 Removed old collection")
+    except Exception:
+        pass
+    
+    collection = client.create_collection(name="ai_governance")
+    
+    def index_items(items, label):
+        log(f"\n🔄 Indexing {label} ({len(items)} items)...")
+        ids = [item['id'] for item in items]
+        documents = [prepare_text_for_embedding(item) for item in items]
+        metadatas = [
+            {
+                "framework": item['framework'],
+                "category": item.get('category', ''),
+                "title": item['title'],
+            }
+            for item in items
+        ]
+        vectors = embeddings_model.encode(
+            documents,
+            show_progress_bar=verbose,
+            convert_to_numpy=True
+        ).tolist()
+        collection.add(
+            ids=ids,
+            documents=documents,
+            embeddings=vectors,
+            metadatas=metadatas
+        )
+        log(f"✅ Indexed {len(ids)} {label}")
+    
+    index_items(ISO_42001_CONTROLS, "ISO 42001 controls")
+    index_items(NIST_AI_RMF_CONTROLS, "NIST AI RMF subcategories")
+    index_items(EU_AI_ACT_RISK_TIERS, "EU AI Act risk tiers")
+    index_items(EU_AI_ACT_ANNEX_III, "EU AI Act Annex III categories")
+    
+    total = collection.count()
+    log(f"\n🎉 AI governance vector store built!")
+    log(f"📊 Total items indexed: {total}")
+    log(f"💾 Saved to: {db_path}")
+    return total
 
 
-# Index all three frameworks
-index_items(ISO_42001_CONTROLS, "ISO 42001 controls")
-index_items(NIST_AI_RMF_CONTROLS, "NIST AI RMF subcategories")
-index_items(EU_AI_ACT_RISK_TIERS, "EU AI Act risk tiers")
-index_items(EU_AI_ACT_ANNEX_III, "EU AI Act Annex III categories")
+def store_exists(db_path: str = None) -> bool:
+    """Check whether the vector store has been built and contains data."""
+    if db_path is None:
+        db_path = _DEFAULT_DB_PATH
+    if not os.path.exists(db_path):
+        return False
+    try:
+        client = chromadb.PersistentClient(path=db_path)
+        collection = client.get_collection(name="ai_governance")
+        return collection.count() > 0
+    except Exception:
+        return False
 
-print(f"\n🎉 AI governance vector store built!")
-print(f"📊 Total items indexed: {collection.count()}")
-print(f"💾 Saved to: ./ai_gov_chroma_db/")
-print(f"🆓 No API quota used — embeddings ran locally")
+
+# Allow running as a script: python build_vectorstore.py
+if __name__ == "__main__":
+    build_store()

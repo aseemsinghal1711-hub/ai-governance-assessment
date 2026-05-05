@@ -14,6 +14,8 @@ Phases:
 import time
 from dotenv import load_dotenv
 import chromadb
+import os
+_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai_gov_chroma_db")
 from sentence_transformers import SentenceTransformer
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -148,7 +150,7 @@ def _get_resources():
     if _embeddings_model is None:
         _embeddings_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
     if _collection is None:
-        client = chromadb.PersistentClient(path="./ai_gov_chroma_db")
+        client = chromadb.PersistentClient(path=_DB_PATH)
         _collection = client.get_collection(name="ai_governance")
     return _embeddings_model, _collection
 
