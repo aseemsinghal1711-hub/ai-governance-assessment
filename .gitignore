@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.streamlit/secrets.toml
+ai_gov_chroma_db/
+*.json
+loan_ai_assessment.json
+.DS_Store
+venv/
+.venv/
