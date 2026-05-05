@@ -297,7 +297,7 @@ def build_intake_agent_v2(profile_state: ProfileStateV2):
         return "\n".join(parts)
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-flash-latest",
         temperature=0.3,
     )
     
