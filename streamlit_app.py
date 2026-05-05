@@ -5,7 +5,15 @@ Multi-page Streamlit app with custom modern SaaS styling.
 Run with: streamlit run streamlit_app.py
 """
 import streamlit as st
+import os
 
+# Bridge Streamlit Cloud secrets to environment variables
+# Locally, .env loads via python-dotenv. On Streamlit Cloud, secrets come via st.secrets.
+try:
+    if "GOOGLE_API_KEY" in st.secrets:
+        os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+except Exception:
+    pass  # st.secrets only works on Streamlit Cloud; locally we use .env
 
 # =============================================================================
 # Page config (must be first Streamlit call)
