@@ -149,13 +149,25 @@ for f in sorted_findings:
     
     severity_emoji = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(f.severity, "⚪")
     
-    with st.expander(f"{severity_emoji} **[{f.framework}] {f.control_id}** — {f.status} ({f.severity})"):
-        st.markdown(f"**Control:** {f.control_title}")
+    # Display: framework + control_id + status are reliable; title may be garbled in source data
+    expander_label = f"{severity_emoji} **[{f.framework}] {f.control_id}** — {f.status} ({f.severity})"
+    
+    with st.expander(expander_label):
+        # The control_title field in some data sources is truncated mid-sentence.
+        # Display it but don't make it the primary descriptor.
+        if f.control_title and f.control_title.strip():
+            st.caption(f"Control area: {f.control_title.strip()}")
+        
         if f.evidence_filename:
-            st.markdown(f"**Evidence:** `{f.evidence_filename}`")
+            st.markdown("**Evidence document**")
+            st.code(f.evidence_filename, language=None)
+        
         if f.evidence_assessment:
-            st.markdown(f"**Evidence assessment:** {f.evidence_assessment}")
-        st.markdown(f"**Reasoning:** {f.reasoning}")
+            st.markdown("**Evidence assessment**")
+            st.write(f.evidence_assessment)
+        
+        st.markdown("**Reasoning**")
+        st.write(f.reasoning)
 
 st.divider()
 
