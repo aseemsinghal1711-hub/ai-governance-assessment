@@ -123,6 +123,32 @@ def _findings_to_summary(report: AssessmentReport) -> str:
         for f in report.findings
     )
 
+import time
+
+
+def _invoke_with_retry(llm_or_chain, prompt, max_attempts: int = 3):
+    """
+    Invoke an LLM/chain with auto-retry on transient errors (503 / capacity issues).
+    Retries up to max_attempts times with exponential backoff: 5s, 10s, 20s.
+    """
+    transient_signals = ("503", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "RATE_LIMIT_EXCEEDED")
+    
+    for attempt in range(max_attempts):
+        try:
+            return llm_or_chain.invoke(prompt)
+        except Exception as e:
+            error_str = str(e)
+            is_transient = any(signal in error_str for signal in transient_signals)
+            is_last_attempt = (attempt == max_attempts - 1)
+            
+            if is_transient and not is_last_attempt:
+                wait_seconds = 5 * (2 ** attempt)  # 5s, 10s, 20s
+                print(f"⚠️ Transient API error (attempt {attempt + 1}/{max_attempts}). Retrying in {wait_seconds}s...")
+                time.sleep(wait_seconds)
+                continue
+            
+            # Non-transient error, or final attempt failed → re-raise
+            raise
 
 def generate_recommendations(
     profile: AISystemProfile,
@@ -149,7 +175,7 @@ def generate_recommendations(
     ).with_structured_output(RemediationPlan)
     
     print("Calling LLM (this may take 30-60 seconds for a complex plan)...")
-    plan = llm.invoke(prompt)
+    plan = _invoke_with_retry(llm, prompt)
     
     total_actions = (
         len(plan.quick_wins) + len(plan.foundation_phase) +
