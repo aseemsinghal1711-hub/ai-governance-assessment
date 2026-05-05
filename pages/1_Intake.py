@@ -28,6 +28,9 @@ if "intake_messages" not in st.session_state:
     })
     st.session_state.intake_messages = initial["messages"]
 
+if "profile" not in st.session_state:
+    st.session_state.profile = None
+
 
 def try_finalize_profile():
     if not st.session_state.intake_messages:
