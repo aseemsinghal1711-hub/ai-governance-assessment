@@ -18,6 +18,63 @@ import os
 _DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai_gov_chroma_db")
 from sentence_transformers import SentenceTransformer
 from langchain_google_genai import ChatGoogleGenerativeAI
+import time
+
+# =============================================================================
+# Multi-model fallback for resilience against Gemini capacity issues (503s)
+# =============================================================================
+MODEL_FALLBACK_CHAIN = [
+    "gemini-flash-latest",
+    "gemini-2.0-flash-exp",
+    "gemini-pro-latest",
+]
+
+
+def _is_transient_error(error_str: str) -> bool:
+    """Detect Gemini transient errors (capacity, rate limits)."""
+    signals = ("503", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "RATE_LIMIT_EXCEEDED", "429")
+    return any(signal in error_str for signal in signals)
+
+
+def _invoke_with_resilience(llm_factory, prompt, max_retries_per_model: int = 2):
+    """
+    Try each model in MODEL_FALLBACK_CHAIN with retry on transient errors.
+    
+    llm_factory is a function that takes a model name and returns a configured LLM
+    (with structured output, temperature, etc.). This lets each call site control
+    its own LLM configuration while sharing the resilience logic.
+    """
+    last_error = None
+    
+    for model_name in MODEL_FALLBACK_CHAIN:
+        try:
+            llm = llm_factory(model_name)
+        except Exception as e:
+            last_error = e
+            continue
+        
+        for attempt in range(max_retries_per_model + 1):
+            try:
+                return llm.invoke(prompt)
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                
+                if not _is_transient_error(error_str):
+                    raise  # Non-transient — fail fast
+                
+                if attempt < max_retries_per_model:
+                    wait_seconds = 3 * (2 ** attempt)  # 3s, 6s
+                    print(f"⚠️ {model_name} attempt {attempt + 1} hit transient error. Retrying in {wait_seconds}s...")
+                    time.sleep(wait_seconds)
+                    continue
+                
+                print(f"❌ {model_name} exhausted retries. Trying next model...")
+                break
+    
+    raise RuntimeError(
+        f"All models in fallback chain unavailable. Try again in a few minutes. Last error: {last_error}"
+    )
 
 from models import (
     AISystemProfile,
@@ -268,10 +325,11 @@ def _scan_evidence_for_relevance(
         return []
     
     # Use a fast, cheap configuration for the scanner
-    scanner_llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
-        temperature=0.0,  # deterministic for scanning
-    ).with_structured_output(RelevanceScanResult)
+    def _make_scanner_llm(model_name):
+        return ChatGoogleGenerativeAI(
+            model=model_name,
+            temperature=0.0,
+        ).with_structured_output(RelevanceScanResult)
     
     relevant_findings = []
     
@@ -289,7 +347,7 @@ def _scan_evidence_for_relevance(
         )
         
         try:
-            result = scanner_llm.invoke(prompt)
+            result = _invoke_with_resilience(_make_scanner_llm, prompt)
             if result.is_relevant and result.relevant_quotes:
                 relevant_findings.append((evidence.filename, result.relevant_quotes))
         except Exception as e:
@@ -321,7 +379,7 @@ def _format_evidence_for_evaluation(
 def _llm_for_assessment():
     """LLM configured for analytical, consistent output."""
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-flash-latest",
         temperature=0.1,
     )
 
