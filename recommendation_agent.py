@@ -5,7 +5,11 @@ produces a phased RemediationPlan with prioritized actions.
 Architecture: Single structured LLM call with the full assessment as context.
 Phased structure (quick wins → foundation → maturity → optimization) forces
 the agent to sequence work rather than list everything as equally urgent.
+
+Resilience: Multi-model fallback. If the primary model is unavailable
+(e.g., capacity issues), automatically tries alternate models before failing.
 """
+import time
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -16,6 +20,16 @@ from models import (
 )
 
 load_dotenv()
+
+
+# =============================================================================
+# Model fallback chain — tried in order if earlier ones hit capacity issues
+# =============================================================================
+MODEL_FALLBACK_CHAIN = [
+    "gemini-flash-latest",
+    "gemini-2.0-flash-exp",
+    "gemini-pro-latest",
+]
 
 
 # =============================================================================
@@ -90,6 +104,9 @@ The executive_summary field is 3-4 sentences for senior leadership reading the r
 - Don't use generic owners like "the team" — name specific roles"""
 
 
+# =============================================================================
+# Helpers
+# =============================================================================
 def _profile_to_brief(profile: AISystemProfile) -> str:
     """Compact profile representation for inclusion in prompt."""
     extra = ""
@@ -123,33 +140,72 @@ def _findings_to_summary(report: AssessmentReport) -> str:
         for f in report.findings
     )
 
-import time
+
+def _is_transient_error(error_str: str) -> bool:
+    """Detect Gemini transient errors (capacity, rate limits, temporary unavailability)."""
+    signals = ("503", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "RATE_LIMIT_EXCEEDED", "429")
+    return any(signal in error_str for signal in signals)
 
 
-def _invoke_with_retry(llm_or_chain, prompt, max_attempts: int = 3):
+def _invoke_with_resilience(prompt, max_retries_per_model: int = 2) -> RemediationPlan:
     """
-    Invoke an LLM/chain with auto-retry on transient errors (503 / capacity issues).
-    Retries up to max_attempts times with exponential backoff: 5s, 10s, 20s.
-    """
-    transient_signals = ("503", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "RATE_LIMIT_EXCEEDED")
+    Try each model in MODEL_FALLBACK_CHAIN with retry on transient errors.
     
-    for attempt in range(max_attempts):
+    Strategy:
+      - Try gemini-flash-latest. If it returns 503, retry up to 2x with backoff.
+      - If still failing, fall back to gemini-2.0-flash-exp. Same retry logic.
+      - If still failing, fall back to gemini-pro-latest.
+      - Only fail when ALL models exhausted on transient errors.
+      - Non-transient errors (e.g., bad API key) fail immediately.
+    """
+    last_error = None
+    
+    for model_name in MODEL_FALLBACK_CHAIN:
+        print(f"Trying model: {model_name}")
+        
         try:
-            return llm_or_chain.invoke(prompt)
+            llm = ChatGoogleGenerativeAI(
+                model=model_name,
+                temperature=0.2,
+            ).with_structured_output(RemediationPlan)
         except Exception as e:
-            error_str = str(e)
-            is_transient = any(signal in error_str for signal in transient_signals)
-            is_last_attempt = (attempt == max_attempts - 1)
-            
-            if is_transient and not is_last_attempt:
-                wait_seconds = 5 * (2 ** attempt)  # 5s, 10s, 20s
-                print(f"⚠️ Transient API error (attempt {attempt + 1}/{max_attempts}). Retrying in {wait_seconds}s...")
-                time.sleep(wait_seconds)
-                continue
-            
-            # Non-transient error, or final attempt failed → re-raise
-            raise
+            print(f"  ❌ Could not initialize {model_name}: {e}")
+            last_error = e
+            continue
+        
+        for attempt in range(max_retries_per_model + 1):
+            try:
+                result = llm.invoke(prompt)
+                print(f"  ✅ Success with {model_name} (attempt {attempt + 1})")
+                return result
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                
+                if not _is_transient_error(error_str):
+                    # Non-transient error — fail fast, don't retry or try other models
+                    raise
+                
+                if attempt < max_retries_per_model:
+                    wait_seconds = 3 * (2 ** attempt)  # 3s, 6s
+                    print(f"  ⚠️ Transient error (attempt {attempt + 1}/{max_retries_per_model + 1}). Retrying in {wait_seconds}s...")
+                    time.sleep(wait_seconds)
+                    continue
+                
+                # Exhausted retries on this model
+                print(f"  ❌ {model_name} exhausted retries — moving to next model")
+                break
+    
+    # All models exhausted on transient errors
+    raise RuntimeError(
+        f"All models in fallback chain are unavailable due to capacity issues. "
+        f"Please try again in a few minutes. Last error: {last_error}"
+    )
 
+
+# =============================================================================
+# Main entry point
+# =============================================================================
 def generate_recommendations(
     profile: AISystemProfile,
     report: AssessmentReport,
@@ -169,13 +225,8 @@ def generate_recommendations(
         immediate_concerns="\n".join(f"- {c}" for c in report.immediate_concerns),
     )
     
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
-        temperature=0.2,  # slightly higher than assessment for varied recommendations
-    ).with_structured_output(RemediationPlan)
-    
-    print("Calling LLM (this may take 30-60 seconds for a complex plan)...")
-    plan = _invoke_with_retry(llm, prompt)
+    print("Calling LLM with multi-model fallback (this may take 30-60 seconds)...")
+    plan = _invoke_with_resilience(prompt)
     
     total_actions = (
         len(plan.quick_wins) + len(plan.foundation_phase) +
