@@ -100,7 +100,7 @@ def render_phase(title: str, emoji: str, timeline: str, actions: list):
             col_a, col_b = st.columns([4, 1])
             with col_a:
                 st.markdown(f"**{i}. {action.title}**")
-                st.caption(f"Owner: {action.owner_role} · Effort: {action.effort}")
+                st.caption(f"Owner: {action.suggested_owner} · Effort: {action.effort}")
             with col_b:
                 effort_color = {"low": "🟢", "medium": "🟡", "high": "🔴"}.get(action.effort, "⚪")
                 st.markdown(f"### {effort_color}")
