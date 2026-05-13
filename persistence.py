@@ -33,11 +33,31 @@ _local_storage = None
 
 
 def _get_storage():
-    """Get or lazily create the LocalStorage instance."""
+    """
+    Get or lazily create the LocalStorage instance.
+    
+    IMPORTANT: LocalStorage() must be called inside a Streamlit page render
+    cycle, not at module import time. It renders a hidden component that
+    bridges Python to the browser's localStorage. The bridge must be active
+    on every page where save/load is used.
+    """
     global _local_storage
     if _local_storage is None:
         _local_storage = LocalStorage()
     return _local_storage
+
+
+def init_storage():
+    """
+    Explicitly initialize the storage component for the current page.
+    
+    Call this at the top of every page (after st.set_page_config) to ensure
+    the JS bridge to localStorage is active. Without this, save/load silently fail.
+    
+    Streamlit's component rendering is tied to the page lifecycle — the bridge
+    must be re-established when navigating between pages.
+    """
+    _get_storage()
 
 
 def _serialize_pydantic(obj):
