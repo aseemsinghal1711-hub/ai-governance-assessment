@@ -3,6 +3,7 @@ import streamlit as st
 from langchain_core.messages import HumanMessage, AIMessage
 
 from intake_agent_v2 import build_intake_agent_v2, ProfileStateV2
+import persistence
 from models import AISystemProfile
 
 
@@ -103,6 +104,9 @@ def try_finalize_profile():
 
 def reset_intake():
     """Clear all intake state and start fresh."""
+    # Clear localStorage first so refresh doesn't restore old data
+    persistence.clear_state()
+    # Then re-initialize fresh in-memory state for this page
     st.session_state.profile_state = ProfileStateV2()
     st.session_state.intake_agent = build_intake_agent_v2(st.session_state.profile_state)
     st.session_state.profile = None
@@ -151,6 +155,8 @@ if st.session_state.profile is None:
             except Exception as e:
                 st.error(f"Agent error: {e}")
         try_finalize_profile()
+        # Auto-save after each exchange so partial intake survives refresh
+        persistence.save_state()
         st.rerun()
 else:
     # Intake complete — show success card with summary

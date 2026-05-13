@@ -19,6 +19,7 @@ except Exception:
 # Auto-build vector store on first run (needed for Streamlit Cloud)
 # =============================================================================
 from build_vectorstore import store_exists, build_store
+import persistence
 
 if not store_exists():
     with st.spinner("First-time setup: building the AI governance knowledge base. This takes about 60 seconds..."):
@@ -253,6 +254,18 @@ footer {visibility: hidden;}
 
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+# =============================================================================
+# Auto-load saved state (silent resume — Option 1B)
+# =============================================================================
+# If the user has a previous session in browser localStorage, restore it now.
+# This runs only once per browser session — flagged via a session_state marker.
+if "_persistence_loaded" not in st.session_state:
+    persistence.load_state()
+    st.session_state._persistence_loaded = True
+
+# =============================================================================
+# Initialize session state
+# =============================================================================
 
 # =============================================================================
 # Initialize session state
@@ -470,9 +483,14 @@ else:
     )
     
     if st.button("🔄 Start a new assessment", type="secondary"):
-        for key in ["profile", "evidence_files", "assessment_report", 
-                    "remediation_plan", "intake_messages"]:
-            st.session_state[key] = None if key not in ["evidence_files", "intake_messages"] else []
+        # Clear localStorage AND in-memory session state
+        persistence.clear_state()
+        # Reset defaults so home page renders cleanly
+        st.session_state.profile = None
+        st.session_state.evidence_files = []
+        st.session_state.assessment_report = None
+        st.session_state.remediation_plan = None
+        st.session_state.intake_messages = []
         st.rerun()
 
 
