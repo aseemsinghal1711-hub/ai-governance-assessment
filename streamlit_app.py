@@ -255,10 +255,13 @@ footer {visibility: hidden;}
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # =============================================================================
-# Auto-load saved state (silent resume — Option 1B)
+# Initialize localStorage bridge and auto-load saved state (Option 1B)
 # =============================================================================
-# If the user has a previous session in browser localStorage, restore it now.
-# This runs only once per browser session — flagged via a session_state marker.
+# IMPORTANT: init_storage() must be called BEFORE load_state() so the
+# JS bridge to localStorage is alive. Otherwise load returns nothing
+# and saves silently fail.
+persistence.init_storage()
+
 if "_persistence_loaded" not in st.session_state:
     persistence.load_state()
     st.session_state._persistence_loaded = True

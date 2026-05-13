@@ -6,6 +6,10 @@ from intake_agent_v2 import build_intake_agent_v2, ProfileStateV2
 import persistence
 from models import AISystemProfile
 
+# =============================================================================
+# Initialize persistence bridge (must run on every page for save to work)
+# =============================================================================
+persistence.init_storage()
 
 # =============================================================================
 # Page setup
