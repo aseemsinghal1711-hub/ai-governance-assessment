@@ -176,8 +176,33 @@ def _invoke_with_resilience(prompt, max_retries_per_model: int = 2) -> Remediati
         for attempt in range(max_retries_per_model + 1):
             try:
                 result = llm.invoke(prompt)
-                print(f"  ✅ Success with {model_name} (attempt {attempt + 1})")
-                return result
+                
+                # LLM sometimes returns object with None list fields when capacity is constrained.
+                # Coerce any None list fields to empty lists so the page renders cleanly.
+                if result is not None:
+                    if result.quick_wins is None:
+                        result.quick_wins = []
+                    if result.foundation_phase is None:
+                        result.foundation_phase = []
+                    if result.maturity_phase is None:
+                        result.maturity_phase = []
+                    if result.optimization_phase is None:
+                        result.optimization_phase = []
+                    
+                    # If literally ALL phases are empty, the LLM didn't actually produce a plan
+                    total_actions = (
+                        len(result.quick_wins) + len(result.foundation_phase) +
+                        len(result.maturity_phase) + len(result.optimization_phase)
+                    )
+                    if total_actions == 0:
+                        print(f"  ⚠️ Plan came back empty — treating as failure")
+                        raise ValueError("Empty plan returned")
+                    
+                    print(f"  ✅ Success with {model_name} (attempt {attempt + 1}): {total_actions} actions")
+                    return result
+                else:
+                    print(f"  ⚠️ Got None response from {model_name}, attempt {attempt + 1}")
+                    raise ValueError("LLM returned None")
             except Exception as e:
                 last_error = e
                 error_str = str(e)

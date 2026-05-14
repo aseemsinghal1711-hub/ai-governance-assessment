@@ -686,15 +686,64 @@ def phase_3_evaluate_controls(
             evidence_section=evidence_section,
         )
         
-        try:
-            finding = llm.invoke(prompt)
-            finding.control_id = item["id"]
-            finding.framework = item["framework"]
-            finding.control_title = item["title"]
-            findings.append(finding)
-            print(f"{finding.status} ({finding.severity})")
-        except Exception as e:
-            print(f"skipped ({str(e)[:60]})")
+        # Try with retries on transient errors AND null returns
+        finding = None
+        last_error = None
+        for attempt in range(3):
+            try:
+                candidate = llm.invoke(prompt)
+                if candidate is not None:
+                    finding = candidate
+                    break
+                # candidate is None — treat as transient, retry
+                last_error = "LLM returned None"
+                if attempt < 2:
+                    import time
+                    time.sleep(2 * (2 ** attempt))  # 2s, 4s
+                    continue
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                if any(s in error_str for s in ("503", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "429")):
+                    if attempt < 2:
+                        import time
+                        wait_seconds = 2 * (2 ** attempt)  # 2s, 4s
+                        time.sleep(wait_seconds)
+                        continue
+                # Non-transient error — break and use fallback
+                break
+        
+        if finding is not None:
+            try:
+                finding.control_id = item["id"]
+                finding.framework = item["framework"]
+                finding.control_title = item["title"]
+                findings.append(finding)
+                print(f"{finding.status} ({finding.severity})")
+            except Exception as e:
+                # Even after retries, finding has unexpected shape — log and use fallback
+                print(f"unexpected shape ({str(e)[:60]}) — using fallback")
+                finding = None
+        
+        # If all retries failed, create a fallback finding so the control isn't silently dropped
+        if finding is None:
+            from models import GapFinding
+            fallback = GapFinding(
+                control_id=item["id"],
+                framework=item["framework"],
+                control_title=item["title"],
+                status="not_met",
+                severity="medium",
+                reasoning=(
+                    f"Automated evaluation unavailable for this control "
+                    f"({str(last_error)[:100] if last_error else 'unknown'}). "
+                    f"Marked 'not_met' conservatively pending manual review."
+                ),
+                evidence_filename=None,
+                evidence_assessment=None,
+            )
+            findings.append(fallback)
+            print(f"⚠️ fallback (not_met/medium) due to transient error")
     
     print(f"   Produced {len(findings)} gap findings")
     return findings
@@ -741,10 +790,36 @@ def phase_4_synthesize_themes(findings: list[GapFinding]) -> CrossFrameworkSynth
         for f in findings
     )
     prompt = PHASE_4_PROMPT.format(findings_summary=findings_text)
-    llm = _llm_for_assessment().with_structured_output(CrossFrameworkSynthesis)
-    result = llm.invoke(prompt)
-    print(f"   Identified {len(result.themes)} cross-framework themes")
-    return result
+    
+    # Try with retries — Phase 4 is a critical synthesis step, give it multiple attempts
+    last_error = None
+    for attempt in range(3):
+        try:
+            llm = _llm_for_assessment().with_structured_output(CrossFrameworkSynthesis)
+            result = llm.invoke(prompt)
+            if result is not None:
+                print(f"   Identified {len(result.themes)} cross-framework themes")
+                return result
+        except Exception as e:
+            last_error = e
+            error_str = str(e)
+            if any(s in error_str for s in ("503", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "429")):
+                if attempt < 2:
+                    import time
+                    wait_seconds = 3 * (2 ** attempt)  # 3s, 6s
+                    print(f"   ⚠️ Themes attempt {attempt + 1} hit transient error, retrying in {wait_seconds}s...")
+                    time.sleep(wait_seconds)
+                    continue
+            break
+    
+    # All retries exhausted — return a graceful fallback so assessment doesn't crash
+    print(f"   ⚠️ Could not synthesize themes after retries. Using fallback.")
+    return CrossFrameworkSynthesis(
+        themes=[
+            "Multiple findings indicate governance gaps across frameworks — review individual findings below for specific patterns.",
+            "Cross-framework synthesis was unavailable. Refer to per-control findings for framework-specific gap details.",
+        ]
+    )
 
 
 # =============================================================================
