@@ -7,11 +7,6 @@ import persistence
 from models import AISystemProfile
 
 # =============================================================================
-# Initialize persistence bridge (must run on every page for save to work)
-# =============================================================================
-persistence.init_storage()
-
-# =============================================================================
 # Page setup
 # =============================================================================
 st.title("🗣️ 1. Intake")
@@ -159,8 +154,6 @@ if st.session_state.profile is None:
             except Exception as e:
                 st.error(f"Agent error: {e}")
         try_finalize_profile()
-        # Auto-save after each exchange so partial intake survives refresh
-        persistence.save_state()
         st.rerun()
 else:
     # Intake complete — show success card with summary
