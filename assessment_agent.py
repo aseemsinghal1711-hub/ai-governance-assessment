@@ -819,10 +819,42 @@ def phase_5_executive_summary(
         findings_summary=findings_summary,
         themes=themes_text,
     )
-    llm = _llm_for_assessment().with_structured_output(ExecutiveSummary)
-    result = llm.invoke(prompt)
-    print("   Summary drafted")
-    return result
+    
+    # Try with retries — phase 5 is a single critical call, give it multiple attempts
+    last_error = None
+    for attempt in range(3):
+        try:
+            llm = _llm_for_assessment().with_structured_output(ExecutiveSummary)
+            result = llm.invoke(prompt)
+            if result is not None:
+                print("   Summary drafted")
+                return result
+        except Exception as e:
+            last_error = e
+            error_str = str(e)
+            if any(s in error_str for s in ("503", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "429")):
+                if attempt < 2:
+                    import time
+                    wait_seconds = 3 * (2 ** attempt)  # 3s, 6s
+                    print(f"   ⚠️ Summary attempt {attempt + 1} hit transient error, retrying in {wait_seconds}s...")
+                    time.sleep(wait_seconds)
+                    continue
+            # Non-transient error or final attempt — fall through to fallback
+            break
+    
+    # All retries exhausted — return a graceful fallback so assessment doesn't crash
+    print(f"   ⚠️ Could not generate executive summary after retries. Using fallback.")
+    return ExecutiveSummary(
+        overall_maturity_summary=(
+            f"AI governance maturity assessment completed for this system. "
+            f"Findings reveal gaps requiring attention across regulatory frameworks. "
+            f"(Note: Automated summary generation encountered an issue — review findings directly.)"
+        ),
+        immediate_concerns=[
+            "Review high-severity findings below for immediate regulatory exposure.",
+            "Verify evidence quality and completeness for high-risk controls.",
+        ],
+    )
 
 
 # =============================================================================
